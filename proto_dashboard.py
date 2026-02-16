@@ -25,14 +25,24 @@ with col3:
 
 col1, col2, col3 = sl.columns(3)
 with col1:
-    sl.metric("Assignment 1",
-              "Assignment 2",
-              "Quiz 1")
+    sl.caption("Assignment 1")
 with col2:
-    sl.metric("Due by Tomorrow 11:59pm",
-              "Due in 3 days 8am",
-              "Starts next Monday from 8am to 10am")
+    sl.caption("Due by Tomorrow 11:59pm")
 with col3:
-    sl.metric("Get it done ASAP, today afterschool would be good",
-              "You got some time, maybe put it off for a day to work on Assignment 1",
-              "Shouldn't be too bad; an hour or two of studying should be fine")
+    sl.caption("Get it done ASAP, today afterschool would be good")
+
+col1, col2, col3 = sl.columns(3)
+with col1:
+    sl.caption("Assignment 2")
+with col2:
+    sl.caption("Due in 3 days 8am")
+with col3:
+    sl.caption("You got some time, maybe put it off to work on Assignment 1")
+
+col1, col2, col3 = sl.columns(3)
+with col1:
+    sl.caption("Quiz 1")
+with col2:
+    sl.caption("Starts next Monday from 8am to 10am")
+with col3:
+    sl.caption("Shouldn't be too bad; an hour or two of studying should be fine")
