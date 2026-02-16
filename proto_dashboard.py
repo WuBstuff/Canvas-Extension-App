@@ -4,7 +4,7 @@
 # type "python -m venv venv" into the terminal, this will create the venv folder needed to run the venv VM, don't need to do this if you already have a venv folder
 # type "venv/bin/activate" into the terminal, this activates the Venv VM
 # ensure that the debugger on VSCode or whatever IDE is set to the Venv version
-# run the file as you typically would, this opens up a window on your browser with the dashboard
+# run the file with "streamlit run proto_dashboard.py", this opens up a window on your browser with the dashboard
 
 import streamlit as sl
 
