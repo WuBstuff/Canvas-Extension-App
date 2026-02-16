@@ -1,4 +1,4 @@
-#This is a barebones prototype of how we want the Canvas dashboard to look like
+#This is a barebones prototype of how we want the Canvas dashboard to look like using StreamLit
 #Some stuff to work on here would be the formatting of the dashboard as well as adding some extra things but this is just the basics
 #In order to run this:
 # type "python -m venv venv" into the terminal, this will create the venv folder needed to run the venv VM, don't need to do this if you already have a venv folder
