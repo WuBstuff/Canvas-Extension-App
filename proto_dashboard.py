@@ -46,3 +46,9 @@ with col2:
     sl.caption("Starts next Monday from 8am to 10am")
 with col3:
     sl.caption("Shouldn't be too bad; an hour or two of studying should be fine")
+
+col1, col2 = sl.columns(2)
+with col1:
+    sl.button("Add Assignment")
+with col2:
+    sl.button("Edit Assignment")
