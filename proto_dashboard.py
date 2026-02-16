@@ -1,7 +1,7 @@
 #This is a barebones prototype of how we want the Canvas dashboard to look like
 #Some stuff to work on here would be the formatting of the dashboard as well as adding some extra things but this is just the basics
 #In order to run this:
-# type "python -m venv venv" into the terminal, this will create the venv folder needed to run the venv VM
+# type "python -m venv venv" into the terminal, this will create the venv folder needed to run the venv VM, don't need to do this if you already have a venv folder
 # type "venv/bin/activate" into the terminal, this activates the Venv VM
 # ensure that the debugger on VSCode or whatever IDE is set to the Venv version
 # run the file as you typically would, this opens up a window on your browser with the dashboard
