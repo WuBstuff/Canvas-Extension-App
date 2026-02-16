@@ -8,6 +8,7 @@
 
 import streamlit as sl
 
+#Page Settings
 sl.set_page_config(
     page_title = "Canvas Dashboard",
     layout = "wide"
@@ -15,6 +16,7 @@ sl.set_page_config(
 sl.title("Welcome to your Canvas Dashboard!")
 sl.markdown("Here is the plan")
 
+#Workload Display
 col1, col2, col3 = sl.columns(3)
 with col1:
     sl.subheader("To-Do List:")
@@ -47,6 +49,7 @@ with col2:
 with col3:
     sl.caption("Shouldn't be too bad; an hour or two of studying should be fine")
 
+#Edit Dashboard
 col1, col2 = sl.columns(2)
 with col1:
     sl.button("Add Assignment")
