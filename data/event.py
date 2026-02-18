@@ -26,7 +26,25 @@ class Event:
         self.location = new_loc
     def EditAdvice(self, new_advice):  #Note: same as with Assignment; advice will be managed by the program and not the student
         self.location = new_advice
+
+    #Event Accessors
+    def GetTitle(self):
+        return self.title
+    def GetDate(self):
+        return self.date
+    def GetSTime(self):
+        return self.start_time
+    def GetETime(self):
+        return self.end_time
+    def GetFreq(self):
+        return self.frequency
+    def GetAdvice(self):
+        return self.advice
+    def GetLoc(self):
+        return self.location
     
     #This particular function will be useful for the logic needed for advice
     def GetTimeLeft(self):
         return dt.datetime.combine(self.date, self.end_time) - dt.datetime.now()
+    
+EventList = []
