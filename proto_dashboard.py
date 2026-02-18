@@ -2,12 +2,13 @@
 #Some stuff to work on here would be the formatting of the dashboard as well as adding some extra things but this is just the basics
 #In order to run this:
 # type "python -m venv venv" into the terminal, this will create the venv folder needed to run the venv VM
-# type "source venv/bin/activate" into the terminal, this activates the Venv VM
+# type "venv/bin/activate" into the terminal, this activates the Venv VM
 # ensure that the debugger on VSCode or whatever IDE is set to the Venv version
 # run the file with "streamlit run proto_dashboard.py", this opens up a window on your browser with the dashboard
 
 import streamlit as sl
-import assignment #implement later, currently working on events
+from event import *
+from assignment import *
 
 #Page Settings
 sl.set_page_config(
@@ -16,25 +17,32 @@ sl.set_page_config(
 )
 sl.title("Welcome to your Canvas Dashboard!")
 
-#Sample Values
-assignments = ("Assignment 1", "Assignment 2", "Quiz 1")
-due_dates = ("Tomorrow 11:59pm", "Thursday 8am", "Next Monday from 8am to 10am")
-advices = ("Get it done ASAP, today afterschool would be good", "You got some time, maybe put it off to work on Assignment 1", "Shouldn't be too bad; an hour or two of studying should be fine")
-
 #Workload Display
 col1, col2, col3 = sl.columns(3)
 with col1:
-    sl.subheader("Here is the (sample) plan:")
+    sl.subheader("Here is the plan:")
 with col2:
     sl.button("Refresh Token")
 with col3:
     sl.button("Input Token")
 
-for index in range(len(assignments)):
+sl.header("Assignment List")
+for index in range(len(AssignmentList)):
     col1, col2, col3 = sl.columns(3)
     with col1:
-        sl.caption(assignments[index])
+        sl.caption(AssignmentList[index].GetName())
     with col2:
-        sl.caption(due_dates[index])
+        sl.caption(AssignmentList[index].GetEDate())
     with col3:
-        sl.caption(advices[index])
+        sl.caption(AssignmentList[index].GetAdvice())
+
+#Event Display
+sl.header("Event List")
+for index in range(len(EventList)):
+    col1, col2, col3 = sl.columns(3)
+    with col1:
+        sl.caption(EventList[index].GetTitle())
+    with col2:
+        sl.caption(EventList[index].GetSTime())
+    with col3:
+        sl.caption(EventList[index].GetAdvice())
