@@ -3,6 +3,7 @@
 
 import streamlit as sl
 import datetime as dt
+from event import *
 
 #Helper Function
 def generate_times():
@@ -22,22 +23,29 @@ sl.title("Add New Event")
 sl.header("Add Event Menu")
 
 sl.subheader("Title")
-sl.text_input("Input Event Title")
+title = sl.text_input("Input Event Title")
 sl.subheader("Date")
-sl.date_input("Input Date")
+date = sl.date_input("Input Date")
 
 col1, col2 = sl.columns(2)
 with col1:
     sl.subheader("From")
-    sl.selectbox("Start Time", times)
+    start = sl.selectbox("Start Time", times)
 with col2:
     sl.subheader("To")
-    sl.selectbox("End Time", times)
+    end = sl.selectbox("End Time", times)
 
 sl.subheader("Frequency")
-sl.selectbox("Select your event's frequency:", ("Does not repeat", "Daily", "Weekly", "Monthly", "Annually", "Every weekday", "Custom"))
+frequency = sl.selectbox("Select your event's frequency:", ("Does not repeat", "Daily", "Weekly", "Monthly", "Annually", "Every weekday", "Custom"))
 sl.subheader("Location")
-sl.text_input("Input Event Location")
+location = sl.text_input("Input Event Location")
 
-if sl.button("Back"):
-    sl.switch_page("proto_dashboard.py")
+col1, col2 = sl.columns(2)
+with col1:
+    if sl.button("Back"):
+        sl.switch_page("proto_dashboard.py")
+with col2:
+    if sl.button("Confirm"):
+        new_event = Event(title, date, start, end, frequency, location, "Advice goes here")
+        EventList.append(new_event)
+        sl.switch_page("proto_dashboard.py")
