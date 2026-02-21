@@ -2,10 +2,16 @@
 #When the user wants to add a new event, this page is opened up
 
 import streamlit as sl
-import datetime as dt
+from datetime import datetime, timedelta
 from event import *
 
-#Helper Function
+#Helper Functions
+def round_to_nearest_minute(dt):
+    # Round down to the nearest minute by stripping seconds/microseconds
+    rounded_dt = dt.replace(second=0, microsecond=0)
+    # Add a minute if the original seconds were 30 or more
+    return rounded_dt + timedelta(minutes=1) if dt.second >= 30 else rounded_dt
+
 def generate_times():
     """Generates a list of times in 12-hour AM/PM format (e.g., '12:00 AM')."""
     times = []
@@ -24,16 +30,14 @@ sl.header("Add Event Menu")
 
 sl.subheader("Title")
 title = sl.text_input("Input Event Title")
-sl.subheader("Date")
-date = sl.date_input("Input Date")
 
-col1, col2 = sl.columns(2)
-with col1:
-    sl.subheader("From")
-    start = sl.selectbox("Start Time", times)
-with col2:
-    sl.subheader("To")
-    end = sl.selectbox("End Time", times)
+sl.subheader("Date")
+date = str(sl.date_input("Input Date"))
+sl.subheader("Time")
+time = str(sl.selectbox("Input Time", times))
+dt_str = f"{date[:4]}-{date[5:7]}-{date[8:]} {time}"
+dt_format = "%Y-%m-%d %I:%M %p"
+time_left = round_to_nearest_minute(datetime.strptime(dt_str, dt_format)) - round_to_nearest_minute(datetime.now())
 
 sl.subheader("Frequency")
 frequency = sl.selectbox("Select your event's frequency:", ("Does not repeat", "Daily", "Weekly", "Monthly", "Annually", "Every weekday", "Custom"))
@@ -43,9 +47,10 @@ location = sl.text_input("Input Event Location")
 col1, col2 = sl.columns(2)
 with col1:
     if sl.button("Back"):
-        sl.switch_page("proto_dashboard.py")
+        sl.switch_page("Dashboard.py")
 with col2:
     if sl.button("Confirm"):
-        new_event = Event(title, date, start, end, frequency, location, "Advice goes here")
+        id = len(EventList) + 1
+        new_event = Event(id, title, time_left, frequency, location)
         EventList.append(new_event)
-        sl.switch_page("proto_dashboard.py")
+        sl.switch_page("Dashboard.py")
