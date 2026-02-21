@@ -2,56 +2,46 @@
 import datetime as dt
 class Assignment:
 
-    def __init__(self, name, prof, start_date, end_date, start_time, end_time, status, advice):
-        self.name = name
-        self.prof = prof
-        self.start_date = start_date
-        self.end_date = end_date
-        self.start_time = start_time
-        self.end_time = end_time
+    def __init__(self, id, name, course, prof, due_date, pts, status, weight):
+        self.id = id              #ID won't be changed, it differentiates Assignments from each other
+        self.name = name          #To the user, the Assignment's name is a better identifier of what it is and knowing what the Assignment is would help determine the advice for it
+        self.course = course
+        self.prof = prof          #Professor won't be important for the student, but it will help to determine professor-based advice
+        self.due_date = due_date
         self.status = status
-        self.advice = advice
+        self.points = pts
+        self.weight_score = weight
 
     #Assignment Mutators
     def EditName(self, new_name):
         self.name = new_name
+    def EditCourse(self, new_course):
+        self.course = new_course
     def EditProf(self, new_prof):
         self.prof = new_prof
-    def EditSDate(self, new_sdate):
-        self.start_date = new_sdate
-    def EditEDate(self, new_edate):
-        self.end_date = new_edate
-    def EditSTime(self, new_stime):
-        self.start_time = new_stime
-    def EditETime(self, new_etime):
-        self.end_time = new_etime
-    def EditAdvice(self, new_advice):  #Note: Not used by the student, it will be generated/changed by the logic
-        self.advice = new_advice
+    def EditDue(self, new_date):
+        self.due_date = new_date
     def EditStatus(self, new_status):
         self.status = new_status
-        if self.status == "Complete":  #No need for this assignment in the dashboard if it's done
-            del self
+    def EditPoints(self, new_pts):
+        self.points = new_pts
+    def EditWeight(self, new_weight):
+        self.weight_score = new_weight
     
     #Assignment Accessors
     def GetName(self):
         return self.name
+    def GetCourse(self):
+        return self.course
     def GetProf(self):
         return self.prof
-    def GetSDate(self):
-        return self.start_date
-    def GetEDate(self):
-        return self.end_date
-    def GetSTime(self):
-        return self.start_time
-    def GetETime(self):
-        return self.end_time
-    def GetAdvice(self):
-        return self.advice
+    def GetDue(self):
+        return self.due_date
     def GetStatus(self):
         return self.status
-
-    #This particular function will be useful for the logic needed for advice
-    def GetTimeLeft(self):
-        return dt.datetime.combine(self.end_date, self.end_time) - dt.datetime.now()
+    def GetPoints(self):
+        return self.points
+    def GetWeight(self):
+        return self.weight_score
     
-AssignmentList = []
+AssignmentList = [] #Will store all Assignments across pages
