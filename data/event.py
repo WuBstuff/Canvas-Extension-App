@@ -1,50 +1,31 @@
 #This file holds the Event class, which outlines how Events are stored and changed, subject to change
-import datetime as dt
 class Event:
 
-    def __init__(self, title, date, stime, etime, frequency, location, advice):
+    def __init__(self, id, title, time_left, frequency, location):
+        self.id = id
         self.title = title
-        self.date = date
-        self.start_time = stime
-        self.end_time = etime
+        self.time = time_left
         self.frequency = frequency
         self.location = location
-        self.advice = advice
     
     #Event Mutators
     def EditTitle(self, new_title):
         self.title = new_title
-    def EditDate(self, new_date):
-        self.date = new_date
-    def EditSTime(self, new_stime):
-        self.start_time = new_stime
-    def EditETime(self, new_etime):
-        self.end_time = new_etime
+    def EditTime(self, new_time):
+        self.time = new_time
     def EditFreq(self, new_freq):
         self.frequency = new_freq
     def EditLoc(self, new_loc):
         self.location = new_loc
-    def EditAdvice(self, new_advice):  #Note: same as with Assignment; advice will be managed by the program and not the student
-        self.location = new_advice
 
     #Event Accessors
     def GetTitle(self):
         return self.title
-    def GetDate(self):
-        return self.date
-    def GetSTime(self):
-        return self.start_time
-    def GetETime(self):
-        return self.end_time
+    def GetTime(self):
+        return self.time
     def GetFreq(self):
         return self.frequency
-    def GetAdvice(self):
-        return self.advice
     def GetLoc(self):
         return self.location
     
-    #This particular function will be useful for the logic needed for advice
-    def GetTimeLeft(self):
-        return dt.datetime.combine(self.date, self.end_time) - dt.datetime.now()
-    
-EventList = []
+EventList = [] #Store all events across pages
