@@ -25,5 +25,25 @@ class SmartScheduler:
 
 
     def generate_predictions(self):
-        # Maps high-point assignments into the free slots
-        return list_of_suggested_events
+        suggested_events = []
+        # sort by importance
+        sorted_tasks = sorted(self.assignments, key=lambda x: x['due_at'])
+
+        # time slot for 3 days place holder
+        now = datetime.now()
+        horizon = now + timedelta(days=3)
+        free_slots = self.find_free_slots(now, horizon)
+
+        slot_index = 0
+        for task in sorted_tasks:
+            if slot_index < len(free_slots):
+                start, end = free_slots[slot_index]
+                
+                suggested_events.append({
+                    "title": f"📝 Study: {task['name']}",
+                    "start_at": start.isoformat(),
+                    "end_at": (start + timedelta(hours=1)).isoformat()
+                })
+                slot_index += 1
+        
+        return suggested_events
