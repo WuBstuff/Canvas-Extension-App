@@ -1,3 +1,5 @@
+#Note: this lets the user edit everything in the Assignment class, including id
+#Might need to make id seperate from the class
 import streamlit as sl
 import pandas as pd
 from assignment import *
