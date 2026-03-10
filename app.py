@@ -24,13 +24,29 @@ with st.sidebar:
     if st.button("Connect to Canvas"):
         if user_token:
             # API LEAD: This is where your code is called
-            # ci = CanvasInterface(user_token)
+            ci = CanvasInterface(user_token, "https://csufullerton.instructure.com")
             # st.session_state.raw_data = ci.get_everything()
+            # st.session_state.raw_data = ci.get_student_workload("2026-02-25", "2026-03-05")
+
+            # 1. NEW: Get all available calendar IDs (User + Courses)
+            all_calendars = ci.get_calendar_sources()
             
-            # MOCK DATA FOR SKELETON TESTING
-            st.session_state.raw_data = {"user": "Test Student", "assignments": []}
+            # 2. Pass those IDs into the workload method
+            workload = ci.get_student_workload(
+                "2026-02-25", 
+                "2026-03-05", 
+                calendar_ids=all_calendars
+            )
+            
+            st.session_state.raw_data = {
+                "user": ci.user.name,
+                "assignments": workload,
+                "available_calendars": all_calendars # Store for tab3/settings
+            }
+            
             st.session_state.authenticated = True
-            st.success("Connected!")
+            st.success(f"Connected to {len(all_calendars)} calendars!")
+            
         else:
             st.error("Please enter a valid token.")
 
