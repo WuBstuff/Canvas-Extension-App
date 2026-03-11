@@ -21,47 +21,102 @@ class CanvasInterface:
         return sources
 
     def get_student_workload(self, start_date, end_date, calendar_ids=None):
-        """
-        Retrieves assignments from specific calendars. 
-        If calendar_ids is None, it defaults to the user's personal calendar.
-        """
         if not calendar_ids:
             calendar_ids = [f"user_{self.user.id}"]
 
-        # We must use type='assignment' to get actual graded items
-        assignments = self.canvas.get_calendar_events(
-            type='assignment',
-            start_date=start_date,
-            end_date=end_date,
-            context_codes=calendar_ids,
-            all_events=True
-        )
+        workload = []
         
-        return [{
-            "title": getattr(a, 'title', 'Untitled'),
-            "due_at": getattr(a, 'start_at', None),
-            "points": getattr(a, 'assignment', {}).get('points_possible', 0),
-            "context": getattr(a, 'context_name', 'Unknown Course')
-        } for a in assignments]
+        # Loop through each calendar individually to isolate 'Forbidden' errors
+        for code in calendar_ids:
+            try:
+                items = self.canvas.get_calendar_events(
+                    type='assignment',
+                    start_date=start_date,
+                    end_date=end_date,
+                    context_codes=[code], # Just this one specific course/user
+                    all_events=True
+                )
+                
+                # Force evaluation of the PaginatedList here to catch errors early
+                for a in items:
+                    workload.append({
+                        "title": getattr(a, 'title', 'Untitled'),
+                        "due_at": getattr(a, 'start_at', None),
+                        "points": getattr(a, 'assignment', {}).get('points_possible', 0),
+                        "context": getattr(a, 'context_name', 'Unknown')
+                    })
+            except Exception as e:
+                # If one course is forbidden, we just print the skip and keep going
+                print(f"Skipping calendar {code} due to error: {e}")
+                continue
+                
+        return workload
+        # """
+        # Retrieves assignments from specific calendars. 
+        # If calendar_ids is None, it defaults to the user's personal calendar.
+        # """
+        # if not calendar_ids:
+        #     calendar_ids = [f"user_{self.user.id}"]
+
+        # # We must use type='assignment' to get actual graded items
+        # assignments = self.canvas.get_calendar_events(
+        #     type='assignment',
+        #     start_date=start_date,
+        #     end_date=end_date,
+        #     context_codes=calendar_ids,
+        #     all_events=True
+        # )
+        
+        # return [{
+        #     "title": getattr(a, 'title', 'Untitled'),
+        #     "due_at": getattr(a, 'start_at', None),
+        #     "points": getattr(a, 'assignment', {}).get('points_possible', 0),
+        #     "context": getattr(a, 'context_name', 'Unknown Course')
+        # } for a in assignments]
 
     def get_existing_events(self, start_date, end_date, calendar_ids=None):
         if not calendar_ids:
             calendar_ids = [f"user_{self.user.id}"]
 
-        events = self.canvas.get_calendar_events(
-            type='event',
-            start_date=start_date,
-            end_date=end_date,
-            context_codes=calendar_ids,
-            all_events=True
-        )
+        all_events = []
+        for code in calendar_ids:
+            try:
+                events = self.canvas.get_calendar_events(
+                    type='event',
+                    start_date=start_date,
+                    end_date=end_date,
+                    context_codes=[code],
+                    all_events=True
+                )
+                for e in events:
+                    all_events.append({
+                        "title": e.title,
+                        "start": e.start_at,
+                        "end": e.end_at,
+                        "context": getattr(e, 'context_name', 'Personal')
+                    })
+            except Exception as e:
+                print(f"Skipping calendar {code} due to error: {e}")
+                continue
+                
+        return all_events
+        # if not calendar_ids:
+        #     calendar_ids = [f"user_{self.user.id}"]
+
+        # events = self.canvas.get_calendar_events(
+        #     type='event',
+        #     start_date=start_date,
+        #     end_date=end_date,
+        #     context_codes=calendar_ids,
+        #     all_events=True
+        # )
         
-        return [{
-            "title": e.title,
-            "start": e.start_at,
-            "end": e.end_at,
-            "context": getattr(e, 'context_name', 'Personal')
-        } for e in events]
+        # return [{
+        #     "title": e.title,
+        #     "start": e.start_at,
+        #     "end": e.end_at,
+        #     "context": getattr(e, 'context_name', 'Personal')
+        # } for e in events]
 
     def get_combined_schedule(self, start_date, end_date):
         """
