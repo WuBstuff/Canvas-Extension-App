@@ -4,7 +4,7 @@ class SmartScheduler:
         self.assignments = assignments
         self.calendar = existing_events
 
-    def find_free_slots(busy_blocks, day_start, day_end):
+    def find_free_slots(self, busy_blocks, day_start, day_end):
         # get time blocks from start of the day to end of the day and sort them
         busy_blocks.sort()
         valid_blocks = [(max(day_start, s), min(day_end, e))
