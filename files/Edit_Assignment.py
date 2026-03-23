@@ -1,5 +1,3 @@
-#Note: this lets the user edit everything in the Assignment class, including id
-#Might need to make id seperate from the class, will figure it out
 import streamlit as sl
 import pandas as pd
 from assignment import *
@@ -7,7 +5,7 @@ from assignment import *
 sl.set_page_config("Edit Assignments")
 
 if 'assignments' not in sl.session_state:
-    sl.session_state.assignments = AssignmentList
+    sl.session_state.assignments = list(AssignmentList.values())
 
 sl.title("Assignment Editor")
 
@@ -39,7 +37,7 @@ if len(AssignmentList) > 0:
         with col2:
             sl.caption(AssignmentList[index].GetCourse())
         with col3:
-            sl.caption(AssignmentList[index].GetDue())
+            sl.caption(f"{AssignmentList[index].GetDate()} by {AssignmentList[index].GetTime()} ({AssignmentList[index].GetTimeLeft()} left)")
         with col4:
             sl.caption(AssignmentList[index].GetPoints())
 else:
