@@ -45,7 +45,7 @@ if len(AssignmentList) > 0:
         with col2:
             sl.caption(AssignmentList[index].GetCourse())
         with col3:
-            sl.caption(AssignmentList[index].GetDue())
+            sl.caption(f"{AssignmentList[index].GetDate()} by {AssignmentList[index].GetTime()} ({AssignmentList[index].GetTimeLeft()} left)")
         with col4:
             sl.caption(AssignmentList[index].GetPoints())
         with col5:
@@ -70,11 +70,11 @@ if len(EventList) > 0:
         with col1:
             sl.caption(EventList[index].GetTitle())
         with col2:
-            sl.caption(EventList[index].GetTime())
+            sl.caption(sl.caption(f"{EventList[index].GetDate()} by {EventList[index].GetTime()} ({EventList[index].GetTimeLeft()} left)"))
         with col3:
-            sl.caption(EventList[index].GetLoc())
-        with col4:
             sl.caption(EventList[index].GetFreq())
+        with col4:
+            sl.caption(EventList[index].GetLoc())
         with col5:
             sl.caption("Generated event advice goes here")
 
