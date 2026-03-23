@@ -1,4 +1,3 @@
-// tweaked a bit
 class SmartScheduler:
     def __init__(self, assignments, existing_events):
         self.assignments = assignments
