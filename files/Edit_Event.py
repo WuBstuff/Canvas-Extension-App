@@ -1,5 +1,3 @@
-#Note: this lets the user edit everything in the Event class, including id
-#Might need to make id seperate from the class
 import streamlit as sl
 import pandas as pd
 from event import *
@@ -7,7 +5,7 @@ from event import *
 sl.set_page_config("Edit Events")
 
 if 'events' not in sl.session_state:
-    sl.session_state.events = EventList
+    sl.session_state.events = list(EventList.values())
 
 sl.title("Event Editor")
 
@@ -39,7 +37,7 @@ if len(EventList) > 0:
         with col2:
             sl.caption(EventList[index].GetTime())
         with col3:
-            sl.caption(EventList[index].GetFreq())
+            sl.caption(f"{EventList[index].GetDate()} by {EventList[index].GetTime()} ({EventList[index].GetTimeLeft()} left)")
         with col4:
             sl.caption(EventList[index].GetLoc())
 else:
