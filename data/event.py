@@ -17,9 +17,6 @@ class Event:
         self.frequency = frequency
         self.location = location
     
-    def __repr__(self):
-        return f"Event(id={self.id}, title={self.title}, time={self.time}, frequency={self.frequency}, location={self.location})"
-    
     #Event Mutators
     def EditTitle(self, new_title):
         self.title = new_title
