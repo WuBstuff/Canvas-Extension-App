@@ -18,24 +18,6 @@ class Assignment:
         self.status = status
         self.points = pts
         self.weight_score = weight
-
-    #Assignment Mutators
-    def EditName(self, new_name):
-        self.name = new_name
-    def EditCourse(self, new_course):
-        self.course = new_course
-    def EditProf(self, new_prof):
-        self.prof = new_prof
-    def EditDate(self, new_date):
-        self.due_date = new_date
-    def EditTime(self, new_time):
-        self.due_time = new_time
-    def EditStatus(self, new_status):
-        self.status = new_status
-    def EditPoints(self, new_pts):
-        self.points = new_pts
-    def EditWeight(self, new_weight):
-        self.weight_score = new_weight
     
     #Assignment Accessors
     def GetName(self):
