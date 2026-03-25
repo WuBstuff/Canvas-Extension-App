@@ -16,18 +16,6 @@ class Event:
         self.time = time
         self.frequency = frequency
         self.location = location
-    
-    #Event Mutators
-    def EditTitle(self, new_title):
-        self.title = new_title
-    def EditDate(self, new_date):
-        self.date = new_date
-    def EditTime(self, new_time):
-        self.time = new_time
-    def EditFreq(self, new_freq):
-        self.frequency = new_freq
-    def EditLoc(self, new_loc):
-        self.location = new_loc
 
     #Event Accessors
     def GetTitle(self):
