@@ -8,46 +8,86 @@ class CanvasInterface:
 
     def get_calendar_sources(self):
         """
-        Returns a list of 'context_codes' for the user and their active courses.
-        These are needed to tell the API which calendars to pull data from.
+        Returns a list of dictionaries containing the Name and ID of favorite calendars.
         """
-        sources = [f"user_{self.user.id}"] # Always include the personal calendar
+        # Start with the personal calendar
+        sources = [{"name": "Personal Calendar", "id": f"user_{self.user.id}"}]
         
-        # Get active courses to include their assignment calendars
-        courses = self.user.get_courses(enrollment_state=['active'])
-        for course in courses:
-            sources.append(f"course_{course.id}")
-            
+        # Get favorite courses (the ones on their dashboard/calendar tab)
+        favorites = self.user.get_favorite_courses()
+        
+        for course in favorites:
+            # Some favorites might be old or weird shells, 
+            # but the 'Favorite' status is our best filter.
+            name = getattr(course, 'name', f"Course {course.id}")
+            sources.append({"name": name, "id": f"course_{course.id}"})
+                
         return sources
+    
+    def get_course_weights(self, calendar_id):
+        """
+        Takes a calendar ID (e.g., 'course_12345') and returns a dictionary
+        of assignment groups and their percentage weights.
+        """
+        # 1. Strip the 'course_' prefix to get the raw integer ID
+        try:
+            course_id = int(calendar_id.replace("course_", ""))
+        except ValueError:
+            return {"Error": "Invalid Course ID format"}
+
+        try:
+            course = self.canvas.get_course(course_id)
+            
+            # Check if the course actually uses weighted grading
+            if not getattr(course, "apply_assignment_group_weights", False):
+                return {"Grading Type": "Points-based (No weights applied)"}
+
+            # 2. Fetch all assignment groups for this course
+            assignment_groups = course.get_assignment_groups()
+            
+            # 3. Construct the weight dictionary
+            # Canvas stores weights as floats (e.g., 20.0 represents 20%)
+            weights = {
+                group.name: f"{group.group_weight}%" 
+                for group in assignment_groups 
+                if group.group_weight > 0
+            }
+            
+            return weights if weights else {"Grading": "No weighted groups found"}
+            
+        except Exception as e:
+            return {"Error": f"Could not retrieve weights: {str(e)}"}
 
     def get_student_workload(self, start_date, end_date, calendar_ids=None):
         if not calendar_ids:
             calendar_ids = [f"user_{self.user.id}"]
 
+        # Force the time to cover the full range of the days provided
+        # Format: 2026-02-25T00:00:00Z
+        iso_start = f"{start_date}T00:00:00Z"
+        iso_end = f"{end_date}T23:59:59Z"
+
         workload = []
-        
-        # Loop through each calendar individually to isolate 'Forbidden' errors
         for code in calendar_ids:
             try:
                 items = self.canvas.get_calendar_events(
                     type='assignment',
-                    start_date=start_date,
-                    end_date=end_date,
-                    context_codes=[code], # Just this one specific course/user
+                    start_date=iso_start,
+                    end_date=iso_end,
+                    context_codes=[code],
                     all_events=True
                 )
                 
-                # Force evaluation of the PaginatedList here to catch errors early
                 for a in items:
+                    # Double-check: Canvas sometimes returns items slightly outside range
+                    # depending on the 'updated_at' vs 'due_at' logic.
                     workload.append({
                         "title": getattr(a, 'title', 'Untitled'),
                         "due_at": getattr(a, 'start_at', None),
                         "points": getattr(a, 'assignment', {}).get('points_possible', 0),
                         "context": getattr(a, 'context_name', 'Unknown')
                     })
-            except Exception as e:
-                # If one course is forbidden, we just print the skip and keep going
-                print(f"Skipping calendar {code} due to error: {e}")
+            except Exception:
                 continue
                 
         return workload
@@ -78,13 +118,19 @@ class CanvasInterface:
         if not calendar_ids:
             calendar_ids = [f"user_{self.user.id}"]
 
+        # Force the time to cover the full range of the days provided
+        # Format: 2026-02-25T00:00:00Z
+        iso_start = f"{start_date}T00:00:00Z"
+        iso_end = f"{end_date}T23:59:59Z"
+
         all_events = []
+
         for code in calendar_ids:
             try:
                 events = self.canvas.get_calendar_events(
                     type='event',
-                    start_date=start_date,
-                    end_date=end_date,
+                    start_date=iso_start,
+                    end_date=iso_end,
                     context_codes=[code],
                     all_events=True
                 )

@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from data.canvas_client import CanvasInterface
 from logic.scheduler import SmartScheduler
+from datetime import datetime, timedelta
 # Import your teammates' work (once files are created)
 # from data.canvas_client import CanvasInterface
 # from logic.scheduler import SmartScheduler
@@ -23,36 +24,48 @@ with st.sidebar:
     
     if st.button("Connect to Canvas"):
         if user_token:
-            # API LEAD: This is where your code is called
+            # Initialize Interface
             ci = CanvasInterface(user_token, "https://csufullerton.instructure.com")
-            # st.session_state.raw_data = ci.get_everything()
-            # st.session_state.raw_data = ci.get_student_workload("2026-02-25", "2026-03-05")
-
-            # 1. NEW: Get all available calendar IDs (User + Courses)
-            all_calendars = ci.get_calendar_sources()
-            
-            # 2. Pass those IDs into the workload method
-            workload = ci.get_student_workload(
-                "2026-02-25", 
-                "2026-03-05", 
-                calendar_ids=all_calendars
-            )
-            
-            st.session_state.raw_data = {
-                "user": ci.user.name,
-                "assignments": workload,
-                "available_calendars": all_calendars # Store for tab3/settings
-            }
-            
+            # Store the interface and the list of sources in session state
+            st.session_state.ci = ci
+            st.session_state.calendar_options = ci.get_calendar_sources()
             st.session_state.authenticated = True
-            st.success(f"Connected to {len(all_calendars)} calendars!")
-            
-        else:
-            st.error("Please enter a valid token.")
+            st.success("Connected! Now select your calendars.")
+
+    # Only show the selection and fetch button IF authenticated
+    if st.session_state.authenticated:
+        st.divider()
+        st.header("Calendar Selection")
+        
+        # Create a display-friendly list for the multiselect
+        options = st.session_state.calendar_options
+        selected_names = st.multiselect(
+            "Select Calendars to Sync",
+            options=[opt["name"] for opt in options],
+            default=[opt["name"] for opt in options] # Default to all selected
+        )
+        
+        # Map the selected names back to their IDs
+        selected_ids = [opt["id"] for opt in options if opt["name"] in selected_names]
+
+        if st.button("Fetch Assignments"):
+            with st.spinner("Fetching data..."):
+                # Use your existing date logic (e.g., next 14 days)
+                start = datetime.now().strftime("%Y-%m-%d")
+                end = (datetime.now() + timedelta(days=14)).strftime("%Y-%m-%d")
+                
+                # Fetch data using only the selected IDs
+                workload = st.session_state.ci.get_student_workload(start, end, calendar_ids=selected_ids)
+                
+                # Update raw_data for the dashboard
+                st.session_state.raw_data = {
+                    "user": st.session_state.ci.user.name,
+                    "assignments": workload
+                }
+                st.success(f"Pulled {len(workload)} assignments!")
 
 # --- 3. MAIN DASHBOARD LOGIC ---
 if st.session_state.authenticated:
-    st.write(f"Welcome back, **{st.session_state.raw_data['user']}**!")
     
     # Create Tabs for different views
     tab1, tab2, tab3 = st.tabs(["Current Tasks", "Smart Schedule", "Settings"])
@@ -60,10 +73,15 @@ if st.session_state.authenticated:
     with tab1:
         st.subheader("Your Canvas Assignments")
         # UI LEAD: Display data here
-        if st.session_state.raw_data['assignments']:
-            st.dataframe(st.session_state.raw_data['assignments'])
+        if st.session_state.raw_data is not None:
+            if st.session_state.raw_data['assignments']:
+                st.dataframe(st.session_state.raw_data['assignments'])
+            else:
+                st.info("No assignments found for the selected range.")
         else:
-            st.info("No assignments found. Hit 'Refresh' to pull new data.")
+            # Tell the user what to do next
+            st.warning("👈 Please select your calendars and click 'Fetch Assignments' in the sidebar.")
+            
 
     with tab2:
         st.subheader("AI Predicted Work Blocks")
