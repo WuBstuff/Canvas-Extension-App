@@ -1,15 +1,11 @@
 #This is a prototype of the add assignment page
 #When the user wants to add a new assignment, this page is opened up
 import streamlit as sl
-from datetime import datetime, timedelta
 from assignment import *
 
-#Helper Functions
-def round_to_nearest_minute(dt):
-    # Round down to the nearest minute by stripping seconds/microseconds
-    rounded_dt = dt.replace(second=0, microsecond=0)
-    # Add a minute if the original seconds were 30 or more
-    return rounded_dt + timedelta(minutes=1) if dt.second >= 30 else rounded_dt
+sl.set_page_config("Add Assignment")
+
+#Helper Function
 
 def generate_times():
     """Generates a list of times in 12-hour AM/PM format (e.g., '12:00 AM')."""
@@ -39,12 +35,9 @@ sl.subheader("Due Date")
 end_date = str(sl.date_input("End Day"))
 sl.subheader("Due Time")
 end_time = str(sl.selectbox("End Time", times))
-dt_str = f"{end_date[:4]}-{end_date[5:7]}-{end_date[8:]} {end_time}"
-dt_format = "%Y-%m-%d %I:%M %p"
-due = round_to_nearest_minute(datetime.strptime(dt_str, dt_format)) - round_to_nearest_minute(datetime.now())
 
 sl.subheader("Points")
-points = sl.number_input("Input Points")
+points = sl.text_input("Input Points")
 sl.subheader("Weight Percent")
 weight_percent = sl.text_input("Input Grade Weight")
 sl.subheader("Status")
@@ -56,8 +49,7 @@ with col1:
         sl.switch_page("Dashboard.py")
 with col2:
     if sl.button("Confirm"):
-        id = len(AssignmentList) + 1
-        new_assignment = Assignment(id, name, course, prof, due, points, status, weight_percent)
-        AssignmentList.append(new_assignment)
-        AssignmentList.sort(key= lambda assignment: getattr(assignment, 'due_date')) #sort the assignment list with earliest due dates first
+        id = len(AssignmentList)
+        new_assignment = Assignment(name, course, prof, end_date, end_time, points, status, weight_percent)
+        AssignmentList[id] = new_assignment
         sl.switch_page("Dashboard.py")
