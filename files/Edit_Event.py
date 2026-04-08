@@ -37,7 +37,7 @@ if len(EventList) > 0:
         with col2:
             sl.caption(EventList[index].GetTime())
         with col3:
-            sl.caption(f"{EventList[index].GetDate()} by {EventList[index].GetTime()} ({EventList[index].GetTimeLeft()} left)")
+            sl.caption(f"{EventList[index].GetDate()} by {EventList[index].GetTime()}")
         with col4:
             sl.caption(EventList[index].GetLoc())
 else:
