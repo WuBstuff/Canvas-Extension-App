@@ -36,10 +36,5 @@ class Assignment:
         return self.points
     def GetWeight(self):
         return self.weight_score
-    def GetTimeLeft(self):
-        dt_str = f"{self.due_date[:4]}-{self.due_date[5:7]}-{self.due_date[8:]} {self.due_time}"
-        dt_format = "%Y-%m-%d %I:%M %p"
-        due = round_to_nearest_minute(datetime.strptime(dt_str, dt_format)) - round_to_nearest_minute(datetime.now())
-        return due
 
 AssignmentList = {} #Will store all Assignments across pages, keyed by IDs
