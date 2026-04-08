@@ -2,9 +2,8 @@
 
 class Assignment:
     def __init__(self, name, course, prof, due_date, due_time, pts, status, weight):
-        self.name = name          #To the user, the Assignment's name is a better identifier of what it is and knowing what the Assignment is would help determine the advice for it
+        self.name = name
         self.course = course
-        self.prof = prof          #Professor won't be important for the student, but it will help to determine professor-based advice
         self.due_date = due_date
         self.due_time = due_time
         self.status = status
@@ -16,8 +15,6 @@ class Assignment:
         return self.name
     def GetCourse(self):
         return self.course
-    def GetProf(self):
-        return self.prof
     def GetDate(self):
         return self.due_date
     def GetTime(self):
