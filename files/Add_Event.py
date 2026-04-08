@@ -2,6 +2,7 @@
 #When the user wants to add a new event, this page is opened up
 
 import streamlit as sl
+import datetime
 from event import *
 
 sl.set_page_config("Add Event")
