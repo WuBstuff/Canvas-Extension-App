@@ -1,6 +1,7 @@
 #This is a prototype of the add assignment page
 #When the user wants to add a new assignment, this page is opened up
 import streamlit as sl
+import datetime
 from assignment import *
 
 sl.set_page_config("Add Assignment")
