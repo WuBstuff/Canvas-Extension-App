@@ -1,13 +1,5 @@
 #This file holds the Assignment class, which outlines how Assignments are stored and changed, subject to change
 
-from datetime import datetime, timedelta
-
-def round_to_nearest_minute(dt):
-    # Round down to the nearest minute by stripping seconds/microseconds
-    rounded_dt = dt.replace(second=0, microsecond=0)
-    # Add a minute if the original seconds were 30 or more
-    return rounded_dt + timedelta(minutes=1) if dt.second >= 30 else rounded_dt
-
 class Assignment:
     def __init__(self, name, course, prof, due_date, due_time, pts, status, weight):
         self.name = name          #To the user, the Assignment's name is a better identifier of what it is and knowing what the Assignment is would help determine the advice for it
