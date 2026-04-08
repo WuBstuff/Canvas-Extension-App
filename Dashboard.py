@@ -17,7 +17,7 @@ def ViewDashboard():
         layout = "wide"
     )
     sl.title("Welcome to your Canvas Dashboard!")
-    
+
     #Workload Display
     if len(AssignmentList) > 0:
         col1, col2, col3 = sl.columns(3)
@@ -34,7 +34,7 @@ def ViewDashboard():
         with col2:
             sl.write("Class")
         with col3:
-            sl.write("Time Left")
+            sl.write("Due Date")
         with col4:
             sl.write("Point Worth")
         with col5:
@@ -46,12 +46,12 @@ def ViewDashboard():
             with col2:
                 sl.caption(AssignmentList[index].GetCourse())
             with col3:
-                sl.caption(f"{AssignmentList[index].GetDate()} by {AssignmentList[index].GetTime()} ({AssignmentList[index].GetTimeLeft()} left)")
+                sl.caption(f"{AssignmentList[index].GetDate()} by {AssignmentList[index].GetTime()}")
             with col4:
                 sl.caption(AssignmentList[index].GetPoints())
             with col5:
                 sl.caption("Generated assignment advice goes here")
-    
+
     #Event Display
     if len(EventList) > 0:
         sl.header("Event List")
@@ -59,9 +59,9 @@ def ViewDashboard():
         with col1:
             sl.write("Event")
         with col2:
-            sl.write("Time")
-        with col3:
             sl.write("Location")
+        with col3:
+            sl.write("Start Time")
         with col4:
             sl.write("Frequency")
         with col5:
@@ -71,14 +71,14 @@ def ViewDashboard():
             with col1:
                 sl.caption(EventList[index].GetTitle())
             with col2:
-                sl.caption(sl.caption(f"{EventList[index].GetDate()} by {EventList[index].GetTime()} ({EventList[index].GetTimeLeft()} left)"))
-            with col3:
-                sl.caption(EventList[index].GetFreq())
-            with col4:
                 sl.caption(EventList[index].GetLoc())
+            with col3:
+                sl.caption(f"{EventList[index].GetDate()} at {EventList[index].GetTime()}")
+            with col4:
+                sl.caption(EventList[index].GetFreq())
             with col5:
                 sl.caption("Generated event advice goes here")
-    
+
     #Tell the user to add something when there is nothing
     if len(AssignmentList) == 0 and len(EventList) == 0:
         sl.write("This planner is empty, perhaps reality has decided to give you free time.")
