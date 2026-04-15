@@ -15,7 +15,7 @@ class SmartScheduler:
     SESSION_DURATION_MINUTES = 60
     BUFFER_MINUTES = 15
 
-    def __init__(
+    def init(
         self,
         assignments: List[Dict[str, Any]],
         busy_events: List[Tuple[datetime, datetime]],
@@ -24,8 +24,7 @@ class SmartScheduler:
         self.busy_events = sorted(busy_events, key=lambda e: e[0])
         self.now = datetime.now().replace(second=0, microsecond=0)
 
-    def _priority_score(self, assignment: Dict[str, Any]) -> float:
-        """Higher score = higher priority."""
+    def priority_score(self, assignment: Dict[str, Any]) -> float:
         due_at: datetime = assignment["due_at"]
         points: float = assignment.get("points", 10)
         weight: float = assignment.get("group_weight", 0.1)
@@ -36,8 +35,7 @@ class SmartScheduler:
 
         return urgency * importance
 
-    def _free_slots(self, days_ahead: int = 7) -> List[Tuple[datetime, datetime]]:
-        """Find all free time windows within study hours over the next N days."""
+    def free_slots(self, days_ahead: int = 7) -> List[Tuple[datetime, datetime]]:
         slots = []
         candidate = self.now.replace(minute=0, second=0, microsecond=0) + timedelta(minutes=self.BUFFER_MINUTES)
         end_window = self.now + timedelta(days=days_ahead)
@@ -76,10 +74,6 @@ class SmartScheduler:
         return slots
 
     def generate_predictions(self) -> List[Dict[str, Any]]:
-        """
-        Generate a list of study session events sorted by priority.
-        Each assignment gets one study block placed in the nearest free slot.
-        """
         sorted_assignments = sorted(self.assignments, key=self._priority_score, reverse=True)
 
         free_slots = self._free_slots()
