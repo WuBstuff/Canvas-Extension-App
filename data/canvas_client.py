@@ -79,12 +79,18 @@ class CanvasInterface:
                 )
                 
                 for a in items:
+                    assignment = getattr(a, 'assignment', None)
+                    if isinstance(assignment, dict):
+                        points = assignment.get('points_possible', 0)
+                    else:
+                        points = getattr(assignment, 'points_possible', 0)
+
                     # Double-check: Canvas sometimes returns items slightly outside range
                     # depending on the 'updated_at' vs 'due_at' logic.
                     workload.append({
                         "title": getattr(a, 'title', 'Untitled'),
                         "due_at": getattr(a, 'start_at', None),
-                        "points": getattr(a, 'assignment', {}).get('points_possible', 0),
+                        "points": points,
                         "context": getattr(a, 'context_name', 'Unknown')
                     })
             except Exception:

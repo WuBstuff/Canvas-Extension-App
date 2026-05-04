@@ -1,11 +1,97 @@
 import streamlit as st
-import pandas as pd
 from data.canvas_client import CanvasInterface
 from logic.scheduler import SmartScheduler
 from datetime import datetime, timedelta
-# Import your teammates' work (once files are created)
-# from data.canvas_client import CanvasInterface
-# from logic.scheduler import SmartScheduler
+from Dashboard import ViewDashboard
+
+CANVAS_BASE_URL = "https://csufullerton.instructure.com"
+
+st.set_page_config(page_title="Smart Canvas Planner", layout="wide")
+
+
+def _parse_canvas_datetime(value):
+    if isinstance(value, datetime):
+        return value
+    if value is None:
+        return None
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+
+    try:
+        return datetime.fromisoformat(text)
+    except ValueError:
+        return None
+
+
+def _scheduler_datetime(value):
+    parsed = _parse_canvas_datetime(value)
+    if parsed is None:
+        return None
+    if parsed.tzinfo is not None:
+        return parsed.astimezone().replace(tzinfo=None)
+    return parsed
+
+
+def _number_or_default(value, default=1):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _build_scheduler_inputs(raw_data):
+    assignments = []
+    for assignment in raw_data.get("assignments", []):
+        due_at = _scheduler_datetime(assignment.get("due_at") or assignment.get("start_at"))
+        if due_at is None:
+            continue
+
+        assignments.append({
+            "name": assignment.get("title") or assignment.get("name") or "Untitled",
+            "due_at": due_at,
+            "points": _number_or_default(assignment.get("points"), default=1),
+            "group_weight": _number_or_default(assignment.get("group_weight"), default=1),
+        })
+
+    existing_events = []
+    for event in raw_data.get("events", []):
+        start = _scheduler_datetime(event.get("start") or event.get("start_at"))
+        end = _scheduler_datetime(event.get("end") or event.get("end_at"))
+        if start is not None and end is not None and end > start:
+            existing_events.append((start, end))
+
+    return assignments, existing_events
+
+
+def run_optimizer():
+    raw_data = st.session_state.get("raw_data")
+    if not raw_data:
+        st.warning("Fetch assignments before running the optimizer.")
+        return
+
+    assignments, existing_events = _build_scheduler_inputs(raw_data)
+    if not assignments:
+        st.session_state.processed_schedule = []
+        st.warning("No assignments with due dates were available to schedule.")
+        return
+
+    try:
+        scheduler = SmartScheduler(assignments, existing_events)
+        st.session_state.processed_schedule = scheduler.generate_predictions()
+    except Exception as exc:
+        st.error(f"Could not generate the smart schedule: {exc}")
+        return
+
+    count = len(st.session_state.processed_schedule)
+    if count:
+        st.success(f"Generated {count} study block{'s' if count != 1 else ''}.")
+    else:
+        st.info("No open study blocks were found in the current schedule window.")
 
 # --- 1. SESSION STATE INITIALIZATION ---
 if 'authenticated' not in st.session_state:
@@ -14,8 +100,8 @@ if 'raw_data' not in st.session_state:
     st.session_state.raw_data = None
 if 'processed_schedule' not in st.session_state:
     st.session_state.processed_schedule = None
-
-st.title("Smart Canvas Planner")
+if 'calendar_options' not in st.session_state:
+    st.session_state.calendar_options = []
 
 # --- 2. SIDEBAR: AUTHENTICATION ---
 with st.sidebar:
@@ -24,13 +110,19 @@ with st.sidebar:
     
     if st.button("Connect to Canvas"):
         if user_token:
-            # Initialize Interface
-            ci = CanvasInterface(user_token, "https://csufullerton.instructure.com")
-            # Store the interface and the list of sources in session state
-            st.session_state.ci = ci
-            st.session_state.calendar_options = ci.get_calendar_sources()
-            st.session_state.authenticated = True
-            st.success("Connected! Now select your calendars.")
+            try:
+                ci = CanvasInterface(user_token, CANVAS_BASE_URL)
+                st.session_state.ci = ci
+                st.session_state.calendar_options = ci.get_calendar_sources()
+                st.session_state.authenticated = True
+                st.session_state.raw_data = None
+                st.session_state.processed_schedule = None
+                st.success("Connected! Now select your calendars.")
+            except Exception as exc:
+                st.session_state.authenticated = False
+                st.error(f"Could not connect to Canvas: {exc}")
+        else:
+            st.warning("Enter a Canvas token before connecting.")
 
     # Only show the selection and fetch button IF authenticated
     if st.session_state.authenticated:
@@ -48,71 +140,21 @@ with st.sidebar:
         # Map the selected names back to their IDs
         selected_ids = [opt["id"] for opt in options if opt["name"] in selected_names]
 
-        if st.button("Fetch Assignments"):
+        if st.button("Fetch Canvas Data"):
             with st.spinner("Fetching data..."):
-                # Use your existing date logic (e.g., next 14 days)
                 start = datetime.now().strftime("%Y-%m-%d")
                 end = (datetime.now() + timedelta(days=14)).strftime("%Y-%m-%d")
                 
-                # Fetch data using only the selected IDs
                 workload = st.session_state.ci.get_student_workload(start, end, calendar_ids=selected_ids)
+                events = st.session_state.ci.get_existing_events(start, end, calendar_ids=selected_ids)
                 
-                # Update raw_data for the dashboard
                 st.session_state.raw_data = {
                     "user": st.session_state.ci.user.name,
-                    "assignments": workload
+                    "assignments": workload,
+                    "events": events,
                 }
-                st.success(f"Pulled {len(workload)} assignments!")
+                st.session_state.processed_schedule = None
+                st.success(f"Pulled {len(workload)} assignments and {len(events)} events!")
 
 # --- 3. MAIN DASHBOARD LOGIC ---
-if st.session_state.authenticated:
-    
-    # Create Tabs for different views
-    tab1, tab2, tab3 = st.tabs(["Current Tasks", "Smart Schedule", "Settings"])
-    
-    with tab1:
-        st.subheader("Your Canvas Assignments")
-        # UI LEAD: Display data here
-        if st.session_state.raw_data is not None:
-            if st.session_state.raw_data['assignments']:
-                st.dataframe(st.session_state.raw_data['assignments'])
-            else:
-                st.info("No assignments found for the selected range.")
-        else:
-            # Tell the user what to do next
-            st.warning("👈 Please select your calendars and click 'Fetch Assignments' in the sidebar.")
-            
-
-    with tab2:
-        st.subheader("AI Predicted Work Blocks")
-        if st.button("Run Optimizer"):
-            # LOGIC LEAD: This is where your scheduler is called
-            # scheduler = SmartScheduler(st.session_state.raw_data)
-            # st.session_state.processed_schedule = scheduler.generate()
-            st.write("Optimization logic running...")
-            
-    with tab3:
-        if st.button("Clear Session"):
-            st.session_state.clear()
-            st.rerun()
-
-else:
-    st.info("Please enter your Canvas Token in the sidebar to begin.")
-
-
-
-
-# # 1. Sidebar - Token Input
-# token = st.sidebar.text_input("Canvas Token", type="password")
-
-# if token:
-#     # 2. Fetch Data
-#     ci = CanvasInterface(token, "https://canvas.instructure.com")
-    
-#     # 3. Show Analytics (Grades, Professor info)
-#     st.header("Your Academic Snapshot")
-    
-#     # 4. The "Sync" Button
-#     if st.button("Generate Smart Schedule"):
-#         # Run the logic and display the preview
-#         # Then offer a button to "Commit to Canvas"
+ViewDashboard(on_run_optimizer=run_optimizer)
