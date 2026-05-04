@@ -37,7 +37,7 @@ if len(AssignmentList) > 0:
         with col2:
             sl.caption(AssignmentList[index].GetCourse())
         with col3:
-            sl.caption(f"{AssignmentList[index].GetDate()} by {AssignmentList[index].GetTime()} ({AssignmentList[index].GetTimeLeft()} left)")
+            sl.caption(f"{AssignmentList[index].GetDate()} by {AssignmentList[index].GetTime()}")
         with col4:
             sl.caption(AssignmentList[index].GetPoints())
 else:

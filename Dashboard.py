@@ -59,7 +59,6 @@ def _format_time_left(value):
         return f"{hours}h {minutes}m"
     return f"{minutes}m"
 
-
 def _format_points(points):
     if points in (None, ""):
         return "0"
@@ -199,43 +198,72 @@ def ViewDashboard(on_run_optimizer=None):
     authenticated = sl.session_state.get("authenticated", False)
 
     sl.title("Welcome to your Canvas Dashboard!")
-
-    if not authenticated:
-        sl.info("Please enter your Canvas token in the sidebar to begin.")
-        if AssignmentList or EventList:
-            sl.caption("Showing local prototype data.")
-            _render_workload(raw_data=None)
-        return
-
-    tab1, tab2, tab3 = sl.tabs(["Current Tasks", "Smart Schedule", "Settings"])
-
-    with tab1:
-        if raw_data is None:
-            sl.warning("Select calendars and click Fetch Canvas Data in the sidebar.")
-        else:
-            user = raw_data.get("user")
-            if user:
-                sl.subheader(f"Workload for {user}")
-            _render_workload(raw_data)
-
-    with tab2:
-        if sl.button("Run Optimizer", type="primary", disabled=raw_data is None):
-            if on_run_optimizer is None:
-                sl.warning("Optimizer is not connected yet.")
-            else:
-                on_run_optimizer()
-
-        _render_schedule(sl.session_state.get("processed_schedule"))
-
-    with tab3:
-        if sl.button("Clear Session"):
-            sl.session_state.clear()
-            sl.rerun()
-
-
-VeiwDashboard = ViewDashboard
-
-
-if __name__ == "__main__":
-    sl.set_page_config(page_title="My Canvas Dashboard", layout="wide")
-    ViewDashboard()
+    
+    #Workload Display
+    if len(AssignmentList) > 0:
+        col1, col2, col3 = sl.columns(3)
+        with col1:
+            sl.subheader("Here is the plan:")
+        with col2:
+            sl.button("Refresh Token")
+        with col3:
+            sl.button("Input Token")
+        sl.header("Assignment List")
+        col1, col2, col3, col4, col5 = sl.columns(5)
+        with col1:
+            sl.write("Assignment")
+        with col2:
+            sl.write("Class")
+        with col3:
+            sl.write("Time Left")
+        with col4:
+            sl.write("Point Worth")
+        with col5:
+            sl.write("Advice")
+        for index in range(len(AssignmentList)):
+            col1, col2, col3, col4, col5 = sl.columns(5)
+            with col1:
+                sl.caption(AssignmentList[index].GetName())
+            with col2:
+                sl.caption(AssignmentList[index].GetCourse())
+            with col3:
+                sl.caption(f"{AssignmentList[index].GetDate()} by {AssignmentList[index].GetTime()} ({AssignmentList[index].GetTimeLeft()} left)")
+            with col4:
+                sl.caption(AssignmentList[index].GetPoints())
+            with col5:
+                sl.caption("Generated assignment advice goes here")
+    
+    #Event Display
+    if len(EventList) > 0:
+        sl.header("Event List")
+        col1, col2, col3, col4, col5 = sl.columns(5)
+        with col1:
+            sl.write("Event")
+        with col2:
+            sl.write("Time")
+        with col3:
+            sl.write("Location")
+        with col4:
+            sl.write("Frequency")
+        with col5:
+            sl.write("Advice")
+        for index in range(len(EventList)):
+            col1, col2, col3, col4, col5 = sl.columns(5)
+            with col1:
+                sl.caption(EventList[index].GetTitle())
+            with col2:
+                sl.caption(sl.caption(f"{EventList[index].GetDate()} by {EventList[index].GetTime()} ({EventList[index].GetTimeLeft()} left)"))
+            with col3:
+                sl.caption(EventList[index].GetFreq())
+            with col4:
+                sl.caption(EventList[index].GetLoc())
+            with col5:
+                sl.caption("Generated event advice goes here")
+    
+    #Tell the user to add something when there is nothing
+    if len(AssignmentList) == 0 and len(EventList) == 0:
+        sl.write("This planner is empty, perhaps reality has decided to give you free time.")
+    elif len(AssignmentList) == 0:
+        sl.write("There are no assignments to plan for. Now would be a good time to enjoy your events.")
+    elif len(EventList) == 0:
+        sl.write("There are no events to plan for. All that remains are your assignments and you are free.")

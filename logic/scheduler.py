@@ -1,70 +1,124 @@
 from datetime import datetime, timedelta
+from typing import List, Tuple, Dict, Any
+
 
 class SmartScheduler:
-    def __init__(self, assignments, existing_events):
-        """
-        assignments: List of dicts including 'name', 'due_at', 'points', 
-                     and 'group_weight' (e.g., 20 for 20%)
-        existing_events: List of (start, end) datetime tuples
-        """
+    """
+    Priority scoring based on:
+    - assignment due date
+    - assignment type weight value
+    - free time windows
+    """
+
+    STUDY_HOURS_START = 8
+    STUDY_HOURS_END = 22
+    SESSION_DURATION_MINUTES = 60
+    BUFFER_MINUTES = 15
+
+    def __init__(
+        self,
+        assignments: List[Dict[str, Any]],
+        busy_events: List[Tuple[datetime, datetime]],
+    ):
         self.assignments = assignments
-        self.busy_blocks = sorted(existing_events)
+        self.busy_events = sorted(busy_events, key=lambda e: e[0])
+        self.now = datetime.now().replace(second=0, microsecond=0)
 
-    def find_free_slots(self, day_start, day_end):
-        freetime = []
-        current_time = day_start
+    def priority_score(self, assignment: Dict[str, Any]) -> float:
+        due_at: datetime = assignment["due_at"]
+        points: float = assignment.get("points", 10)
+        weight: float = assignment.get("group_weight", 0.1)
 
-        valid_blocks = sorted([
-            (max(day_start, s), min(day_end, e))
-            for s, e in self.busy_blocks if s < day_end and e > day_start
-        ])
+        hours_until_due = max((due_at - self.now).total_seconds() / 3600, 0.01)
+        urgency = 1 / hours_until_due
+        importance = points * weight
 
-        for start, end in valid_blocks:
-            if start > current_time:
+        return urgency * importance
 
-                if (start - current_time) >= timedelta(minutes=30):
-                    freetime.append((current_time, start))
-            current_time = max(current_time, end)
-        
-        if current_time < day_end:
-            freetime.append((current_time, day_end))
-        
-        return freetime
+    def free_slots(self, days_ahead: int = 7) -> List[Tuple[datetime, datetime]]:
+        slots = []
+        candidate = self.now.replace(minute=0, second=0, microsecond=0) + timedelta(minutes=self.BUFFER_MINUTES)
+        end_window = self.now + timedelta(days=days_ahead)
 
-    def generate_predictions(self):
-        suggested_events = []
+        while candidate < end_window:
+            day_start = candidate.replace(hour=self.STUDY_HOURS_START, minute=0)
+            day_end = candidate.replace(hour=self.STUDY_HOURS_END, minute=0)
 
-        now = datetime.now()
-        
-        for task in self.assignments:
-            weight = task.get('group_weight', 1)
-            time_diff = (task['due_at'] - now).total_seconds() / 3600
-            
-            hours_left = max(1, time_diff)
-            
-            task['priority_score'] = (task['points'] * weight) / hours_left
+            if candidate < day_start:
+                candidate = day_start
+                continue
 
-        sorted_tasks = sorted(self.assignments, key=lambda x: x['priority_score'], reverse=True)
+            if candidate >= day_end:
+                candidate = (candidate + timedelta(days=1)).replace(hour=self.STUDY_HOURS_START, minute=0)
+                continue
 
-        horizon = now + timedelta(days=3)
-        free_slots = self.find_free_slots(now, horizon)
+            slot_end = candidate + timedelta(minutes=self.SESSION_DURATION_MINUTES)
 
-        slot_index = 0
-        for task in sorted_tasks:
+            if slot_end > day_end:
+                candidate = (candidate + timedelta(days=1)).replace(hour=self.STUDY_HOURS_START, minute=0)
+                continue
 
-            if slot_index < len(free_slots):
-                start, end = free_slots[slot_index]
-                
-                if start < task['due_at']:
+            overlaps = False
+            for busy_start, busy_end in self.busy_events:
+                buffered_start = busy_start - timedelta(minutes=self.BUFFER_MINUTES)
+                buffered_end = busy_end + timedelta(minutes=self.BUFFER_MINUTES)
+                if candidate < buffered_end and slot_end > buffered_start:
+                    overlaps = True
+                    candidate = buffered_end
+                    break
 
-                    study_duration = min(2, max(1, task['points'] / 50))
-                    
-                    suggested_events.append({
-                        "title": f"📝 High Priority: {task['name']}",
-                        "start_at": start.isoformat(),
-                        "end_at": (start + timedelta(hours=study_duration)).isoformat(),
-                        "description": f"Priority Score: {round(task['priority_score'], 2)}"
-                    })
-                    slot_index += 1
-        
-        return suggested_events
+            if not overlaps:
+                slots.append((candidate, slot_end))
+                candidate = slot_end + timedelta(minutes=self.BUFFER_MINUTES)
+
+        return slots
+
+    def generate_predictions(self) -> List[Dict[str, Any]]:
+        sorted_assignments = sorted(
+            self.assignments,
+            key=self.priority_score,
+            reverse=True
+        )
+
+        free_slots = self.free_slots()
+        used_slot_indices = set()
+        events = []
+
+        for assignment in sorted_assignments:
+            score = self.priority_score(assignment)
+            due_at: datetime = assignment["due_at"]
+
+            slot_index = None
+            for i, (slot_start, _) in enumerate(free_slots):
+                if i in used_slot_indices:
+                    continue
+                if slot_start < due_at:
+                    slot_index = i
+                    break
+
+            if slot_index is None:
+                for i in range(len(free_slots)):
+                    if i not in used_slot_indices:
+                        slot_index = i
+                        break
+
+            if slot_index is None:
+                continue
+
+            used_slot_indices.add(slot_index)
+            slot_start, slot_end = free_slots[slot_index]
+
+            time_remaining_h = max((due_at - slot_start).total_seconds() / 3600, 0)
+
+            events.append({
+                "title": f"Study: {assignment['name']}",
+                "start_at": slot_start.strftime("%Y-%m-%d %H:%M"),
+                "end_at": slot_end.strftime("%Y-%m-%d %H:%M"),
+                "description": (
+                    f"Priority score: {score:.4f} | "
+                    f"Due: {due_at.strftime('%Y-%m-%d %H:%M')} | "
+                    f"Time remaining after session: {time_remaining_h:.1f}h"
+                ),
+            })
+
+        return sorted(events, key=lambda e: e["start_at"])

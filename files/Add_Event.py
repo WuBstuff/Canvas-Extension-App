@@ -2,12 +2,12 @@
 #When the user wants to add a new event, this page is opened up
 
 import streamlit as sl
+import datetime
 from event import *
 
 sl.set_page_config("Add Event")
 
 #Helper Functions
-
 def generate_times():
     """Generates a list of times in 12-hour AM/PM format (e.g., '12:00 AM')."""
     times = []
