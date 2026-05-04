@@ -15,7 +15,7 @@ class SmartScheduler:
     SESSION_DURATION_MINUTES = 60
     BUFFER_MINUTES = 15
 
-    def init(
+    def __init__(
         self,
         assignments: List[Dict[str, Any]],
         busy_events: List[Tuple[datetime, datetime]],
@@ -74,18 +74,22 @@ class SmartScheduler:
         return slots
 
     def generate_predictions(self) -> List[Dict[str, Any]]:
-        sorted_assignments = sorted(self.assignments, key=self._priority_score, reverse=True)
+        sorted_assignments = sorted(
+            self.assignments,
+            key=self.priority_score,
+            reverse=True
+        )
 
-        free_slots = self._free_slots()
+        free_slots = self.free_slots()
         used_slot_indices = set()
         events = []
 
         for assignment in sorted_assignments:
-            score = self._priority_score(assignment)
+            score = self.priority_score(assignment)
             due_at: datetime = assignment["due_at"]
 
             slot_index = None
-            for i, (slot_start, slot_end) in enumerate(free_slots):
+            for i, (slot_start, _) in enumerate(free_slots):
                 if i in used_slot_indices:
                     continue
                 if slot_start < due_at:
@@ -93,7 +97,7 @@ class SmartScheduler:
                     break
 
             if slot_index is None:
-                for i, (slot_start, slot_end) in enumerate(free_slots):
+                for i in range(len(free_slots)):
                     if i not in used_slot_indices:
                         slot_index = i
                         break
@@ -105,6 +109,7 @@ class SmartScheduler:
             slot_start, slot_end = free_slots[slot_index]
 
             time_remaining_h = max((due_at - slot_start).total_seconds() / 3600, 0)
+
             events.append({
                 "title": f"Study: {assignment['name']}",
                 "start_at": slot_start.strftime("%Y-%m-%d %H:%M"),
