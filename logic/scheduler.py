@@ -108,7 +108,7 @@ class SmartScheduler:
             used_slot_indices.add(slot_index)
             slot_start, slot_end = free_slots[slot_index]
 
-            time_remaining_h = max((due_at - slot_start).total_seconds() / 3600, 0)
+            time_remaining_h = max((due_at - slot_end).total_seconds() / 3600, 0)
 
             events.append({
                 "title": f"Study: {assignment['name']}",
