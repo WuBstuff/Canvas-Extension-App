@@ -87,6 +87,8 @@ class SmartScheduler:
         for assignment in sorted_assignments:
             score = self.priority_score(assignment)
             due_at: datetime = assignment["due_at"]
+            course_name = assignment.get("course_name", "Unknown")
+            event_title = f"study block for {assignment['name']} {course_name}"
 
             slot_index = None
             for i, (slot_start, _) in enumerate(free_slots):
@@ -111,11 +113,16 @@ class SmartScheduler:
             time_remaining_h = max((due_at - slot_end).total_seconds() / 3600, 0)
 
             events.append({
-                "title": f"Study: {assignment['name']}",
-                "start_at": slot_start.strftime("%Y-%m-%d %H:%M"),
-                "end_at": slot_end.strftime("%Y-%m-%d %H:%M"),
+                "title": event_title,
+                "start_at": slot_start.isoformat(),
+                "end_at": slot_end.isoformat(),
+                "calendar_id": assignment.get("calendar_id"),
+                "assignment_name": assignment["name"],
+                "course_name": course_name,
+                "canvas_assignment_id": assignment.get("canvas_assignment_id"),
                 "description": (
                     f"Priority score: {score:.4f} | "
+                    f"Category: {assignment.get('assignment_group_name', 'Unweighted')} | "
                     f"Due: {due_at.strftime('%Y-%m-%d %H:%M')} | "
                     f"Time remaining after session: {time_remaining_h:.1f}h"
                 ),

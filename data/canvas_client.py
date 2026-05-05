@@ -5,6 +5,151 @@ class CanvasInterface:
     def __init__(self, token, base_url):
         self.canvas = Canvas(base_url, token)
         self.user = self.canvas.get_current_user()
+        self._assignment_group_cache = {}
+
+    @staticmethod
+    def _get_value(obj, key, default=None):
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
+
+    @staticmethod
+    def _course_id_from_context(context_code):
+        if not context_code or not str(context_code).startswith("course_"):
+            return None
+
+        try:
+            return int(str(context_code).replace("course_", "", 1))
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _normalize_weight(weight, default=1.0):
+        if weight in (None, ""):
+            return default
+
+        text = str(weight).strip()
+        if text.endswith("%"):
+            text = text[:-1]
+
+        try:
+            number = float(text)
+        except (TypeError, ValueError):
+            return default
+
+        if number > 1:
+            return number / 100
+        return number
+
+    @staticmethod
+    def _weight_percent(weight):
+        try:
+            return round(float(weight) * 100, 2)
+        except (TypeError, ValueError):
+            return None
+
+    def _get_assignment_group_lookup(self, course_id):
+        if course_id is None:
+            return {}
+
+        if course_id in self._assignment_group_cache:
+            return self._assignment_group_cache[course_id]
+
+        try:
+            course = self.canvas.get_course(course_id)
+            weighted = getattr(course, "apply_assignment_group_weights", False)
+            groups = course.get_assignment_groups()
+        except Exception:
+            self._assignment_group_cache[course_id] = {}
+            return {}
+
+        lookup = {}
+        for group in groups:
+            group_id = self._get_value(group, "id")
+            raw_weight = self._get_value(group, "group_weight", 0)
+            weight = self._normalize_weight(raw_weight, default=0 if weighted else 1)
+            group_info = {
+                "name": self._get_value(group, "name", "Unknown category"),
+                "weight": weight,
+                "weight_percent": self._weight_percent(weight),
+                "weighted_grading": weighted,
+            }
+            lookup[group_id] = group_info
+            lookup[str(group_id)] = group_info
+
+        self._assignment_group_cache[course_id] = lookup
+        return lookup
+
+    def _get_full_assignment(self, course_id, assignment_id):
+        if course_id is None or assignment_id is None:
+            return None
+
+        try:
+            course = self.canvas.get_course(course_id)
+            return course.get_assignment(assignment_id)
+        except Exception:
+            return None
+
+    def _assignment_payload(self, calendar_event, context_code):
+        assignment = self._get_value(calendar_event, "assignment")
+        course_id = (
+            self._course_id_from_context(context_code)
+            or self._get_value(assignment, "course_id")
+        )
+        assignment_id = (
+            self._get_value(assignment, "id")
+            or self._get_value(calendar_event, "assignment_id")
+        )
+
+        full_assignment = None
+        assignment_group_id = self._get_value(assignment, "assignment_group_id")
+        points = self._get_value(assignment, "points_possible")
+        due_at = (
+            self._get_value(calendar_event, "start_at")
+            or self._get_value(assignment, "due_at")
+        )
+
+        if (assignment_group_id is None or points is None) and course_id and assignment_id:
+            full_assignment = self._get_full_assignment(course_id, assignment_id)
+            assignment_group_id = assignment_group_id or self._get_value(full_assignment, "assignment_group_id")
+            points = points if points is not None else self._get_value(full_assignment, "points_possible")
+            due_at = due_at or self._get_value(full_assignment, "due_at")
+
+        group_lookup = self._get_assignment_group_lookup(course_id)
+        group_info = (
+            group_lookup.get(assignment_group_id)
+            or group_lookup.get(str(assignment_group_id))
+            or {}
+        )
+        group_weight = group_info.get("weight", 1.0)
+
+        title = (
+            self._get_value(calendar_event, "title")
+            or self._get_value(assignment, "name")
+            or self._get_value(full_assignment, "name")
+            or "Untitled"
+        )
+        context_name = self._get_value(calendar_event, "context_name", "Unknown")
+        event_id = self._get_value(calendar_event, "id")
+        item_id = assignment_id or event_id or f"{context_code}:{title}:{due_at}"
+
+        return {
+            "id": f"assignment_{course_id or context_code}_{item_id}",
+            "include": True,
+            "canvas_assignment_id": assignment_id,
+            "canvas_event_id": event_id,
+            "context_code": context_code,
+            "course_id": course_id,
+            "course_name": context_name,
+            "context": context_name,
+            "title": title,
+            "due_at": due_at,
+            "points": points or 0,
+            "assignment_group_id": assignment_group_id,
+            "assignment_group_name": group_info.get("name", "Unweighted"),
+            "group_weight": group_weight,
+            "group_weight_percent": group_info.get("weight_percent", self._weight_percent(group_weight)),
+        }
 
     def get_calendar_sources(self):
         """
@@ -42,15 +187,10 @@ class CanvasInterface:
             if not getattr(course, "apply_assignment_group_weights", False):
                 return {"Grading Type": "Points-based (No weights applied)"}
 
-            # 2. Fetch all assignment groups for this course
-            assignment_groups = course.get_assignment_groups()
-            
-            # 3. Construct the weight dictionary
-            # Canvas stores weights as floats (e.g., 20.0 represents 20%)
             weights = {
-                group.name: f"{group.group_weight}%" 
-                for group in assignment_groups 
-                if group.group_weight > 0
+                group["name"]: f"{group['weight_percent']}%"
+                for group in self._get_assignment_group_lookup(course_id).values()
+                if group["weight_percent"] is not None and group["weight_percent"] > 0
             }
             
             return weights if weights else {"Grading": "No weighted groups found"}
@@ -79,20 +219,10 @@ class CanvasInterface:
                 )
                 
                 for a in items:
-                    assignment = getattr(a, 'assignment', None)
-                    if isinstance(assignment, dict):
-                        points = assignment.get('points_possible', 0)
-                    else:
-                        points = getattr(assignment, 'points_possible', 0)
-
-                    # Double-check: Canvas sometimes returns items slightly outside range
-                    # depending on the 'updated_at' vs 'due_at' logic.
-                    workload.append({
-                        "title": getattr(a, 'title', 'Untitled'),
-                        "due_at": getattr(a, 'start_at', None),
-                        "points": points,
-                        "context": getattr(a, 'context_name', 'Unknown')
-                    })
+                    try:
+                        workload.append(self._assignment_payload(a, code))
+                    except Exception:
+                        continue
             except Exception:
                 continue
                 
@@ -141,10 +271,15 @@ class CanvasInterface:
                     all_events=True
                 )
                 for e in events:
+                    event_id = getattr(e, 'id', None)
                     all_events.append({
-                        "title": e.title,
-                        "start": e.start_at,
-                        "end": e.end_at,
+                        "id": f"event_{event_id or code}_{getattr(e, 'start_at', '')}",
+                        "include": True,
+                        "canvas_event_id": event_id,
+                        "context_code": code,
+                        "title": getattr(e, 'title', 'Untitled'),
+                        "start": getattr(e, 'start_at', None),
+                        "end": getattr(e, 'end_at', None),
                         "context": getattr(e, 'context_name', 'Personal')
                     })
             except Exception as e:

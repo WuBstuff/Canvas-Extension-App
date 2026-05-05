@@ -1,4 +1,5 @@
 import streamlit as sl
+import pandas as pd
 from datetime import datetime, timedelta
 
 from data.assignment import AssignmentList
@@ -69,6 +70,69 @@ def _format_points(points):
     return str(int(number)) if number.is_integer() else f"{number:g}"
 
 
+def _clean_value(value, default=""):
+    if value is None:
+        return default
+    try:
+        if pd.isna(value):
+            return default
+    except (TypeError, ValueError):
+        pass
+    return value
+
+
+def _clean_text(value, default=""):
+    value = _clean_value(value, default=default)
+    return str(value).strip() if value != "" else default
+
+
+def _number_or_default(value, default=0):
+    value = _clean_value(value, default=default)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _bool_or_default(value, default=True):
+    value = _clean_value(value, default=default)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() not in ("false", "0", "no", "off")
+    return bool(value)
+
+
+def _normalize_weight(value, default=1.0):
+    value = _clean_value(value, default=default)
+    text = str(value).strip()
+    if text.endswith("%"):
+        text = text[:-1]
+
+    try:
+        weight = float(text)
+    except (TypeError, ValueError):
+        return default
+
+    if weight > 1:
+        return weight / 100
+    return weight
+
+
+def _weight_percent(value):
+    try:
+        return round(float(value) * 100, 2)
+    except (TypeError, ValueError):
+        return 100
+
+
+def _set_if_changed(item, key, value):
+    if item.get(key) == value:
+        return False
+    item[key] = value
+    return True
+
+
 def _assignment_advice(due_at, points):
     parsed = _parse_datetime(due_at)
     if parsed is None:
@@ -100,10 +164,12 @@ def _canvas_assignment_rows(assignments):
         points = assignment.get("points")
         rows.append({
             "Assignment": title,
-            "Class": assignment.get("context") or assignment.get("course") or "Unknown",
+            "Class": assignment.get("course_name") or assignment.get("context") or assignment.get("course") or "Unknown",
             "Due": _format_datetime(due_at),
             "Time Left": _format_time_left(due_at),
             "Points": _format_points(points),
+            "Category": assignment.get("assignment_group_name", "Unweighted"),
+            "Weight": f"{_weight_percent(assignment.get('group_weight', 1))}%",
             "Advice": _assignment_advice(due_at, points),
         })
     return rows
@@ -153,6 +219,96 @@ def _prototype_event_rows():
     return rows
 
 
+def _assignment_editor_rows(assignments):
+    rows = []
+    for index, assignment in enumerate(assignments):
+        row_id = assignment.get("id") or f"assignment_{index}"
+        assignment["id"] = row_id
+        weight = assignment.get("group_weight")
+        rows.append({
+            "id": row_id,
+            "Include": _bool_or_default(assignment.get("include", True)),
+            "Assignment": assignment.get("title") or assignment.get("name") or "Untitled",
+            "Course": assignment.get("course_name") or assignment.get("context") or assignment.get("course") or "Unknown",
+            "Due": assignment.get("due_at") or assignment.get("start_at") or "",
+            "Points": _number_or_default(assignment.get("points"), default=0),
+            "Category": assignment.get("assignment_group_name", "Unweighted"),
+            "Category Weight %": assignment.get("group_weight_percent", _weight_percent(weight or 1)),
+        })
+    return pd.DataFrame(rows)
+
+
+def _event_editor_rows(events):
+    rows = []
+    for index, event in enumerate(events):
+        row_id = event.get("id") or f"event_{index}"
+        event["id"] = row_id
+        rows.append({
+            "id": row_id,
+            "Include": _bool_or_default(event.get("include", True)),
+            "Event": event.get("title") or "Untitled",
+            "Start": event.get("start") or event.get("start_at") or "",
+            "End": event.get("end") or event.get("end_at") or "",
+            "Calendar": event.get("context") or "Personal",
+        })
+    return pd.DataFrame(rows)
+
+
+def _merge_assignment_edits(assignments, edited_rows):
+    changed = False
+    by_id = {assignment.get("id"): assignment for assignment in assignments}
+
+    for row in edited_rows:
+        assignment = by_id.get(row.get("id"))
+        if assignment is None:
+            continue
+
+        include = _bool_or_default(row.get("Include"), default=True)
+        title = _clean_text(row.get("Assignment"), default="Untitled")
+        course = _clean_text(row.get("Course"), default="Unknown")
+        due_at = _clean_text(row.get("Due"))
+        points = _number_or_default(row.get("Points"), default=0)
+        category = _clean_text(row.get("Category"), default="Unweighted")
+        group_weight = _normalize_weight(row.get("Category Weight %"), default=assignment.get("group_weight", 1))
+        group_weight_percent = _weight_percent(group_weight)
+
+        changed |= _set_if_changed(assignment, "include", include)
+        changed |= _set_if_changed(assignment, "title", title)
+        changed |= _set_if_changed(assignment, "course_name", course)
+        changed |= _set_if_changed(assignment, "context", course)
+        changed |= _set_if_changed(assignment, "due_at", due_at)
+        changed |= _set_if_changed(assignment, "points", points)
+        changed |= _set_if_changed(assignment, "assignment_group_name", category)
+        changed |= _set_if_changed(assignment, "group_weight", group_weight)
+        changed |= _set_if_changed(assignment, "group_weight_percent", group_weight_percent)
+
+    return changed
+
+
+def _merge_event_edits(events, edited_rows):
+    changed = False
+    by_id = {event.get("id"): event for event in events}
+
+    for row in edited_rows:
+        event = by_id.get(row.get("id"))
+        if event is None:
+            continue
+
+        include = _bool_or_default(row.get("Include"), default=True)
+        title = _clean_text(row.get("Event"), default="Untitled")
+        start = _clean_text(row.get("Start"))
+        end = _clean_text(row.get("End"))
+        calendar = _clean_text(row.get("Calendar"), default="Personal")
+
+        changed |= _set_if_changed(event, "include", include)
+        changed |= _set_if_changed(event, "title", title)
+        changed |= _set_if_changed(event, "start", start)
+        changed |= _set_if_changed(event, "end", end)
+        changed |= _set_if_changed(event, "context", calendar)
+
+    return changed
+
+
 def _render_workload(raw_data):
     assignments = raw_data.get("assignments", []) if raw_data else []
     events = raw_data.get("events", []) if raw_data else []
@@ -177,6 +333,87 @@ def _render_workload(raw_data):
         sl.info("No events found for the selected range.")
 
 
+def _render_editable_workload(raw_data):
+    assignments = raw_data.get("assignments", [])
+    events = raw_data.get("events", [])
+    version = sl.session_state.get("raw_data_version", 0)
+
+    sl.header("Assignment List")
+    if assignments:
+        assignment_df = _assignment_editor_rows(assignments)
+        edited_assignments = sl.data_editor(
+            assignment_df,
+            key=f"assignment_editor_{version}",
+            use_container_width=True,
+            hide_index=True,
+            num_rows="fixed",
+            column_order=[
+                "Include",
+                "Assignment",
+                "Course",
+                "Due",
+                "Points",
+                "Category",
+                "Category Weight %",
+            ],
+            column_config={
+                "Include": sl.column_config.CheckboxColumn("Include"),
+                "Points": sl.column_config.NumberColumn("Points", min_value=0, step=1),
+                "Category Weight %": sl.column_config.NumberColumn(
+                    "Category Weight %",
+                    min_value=0,
+                    max_value=100,
+                    step=0.1,
+                ),
+            },
+        )
+        if _merge_assignment_edits(assignments, edited_assignments.to_dict("records")):
+            sl.session_state.processed_schedule = None
+
+        included = sum(1 for assignment in assignments if assignment.get("include", True))
+        sl.caption(f"{included} of {len(assignments)} assignments included in scheduler calculations.")
+
+        if sl.button("Remove unchecked assignments", disabled=included == len(assignments)):
+            raw_data["assignments"] = [
+                assignment for assignment in assignments
+                if assignment.get("include", True)
+            ]
+            sl.session_state.processed_schedule = None
+            sl.rerun()
+    else:
+        sl.info("No assignments found for the selected range.")
+
+    sl.header("Event List")
+    if events:
+        event_df = _event_editor_rows(events)
+        edited_events = sl.data_editor(
+            event_df,
+            key=f"event_editor_{version}",
+            use_container_width=True,
+            hide_index=True,
+            num_rows="fixed",
+            column_order=["Include", "Event", "Start", "End", "Calendar"],
+            column_config={
+                "Include": sl.column_config.CheckboxColumn("Include"),
+            },
+        )
+        if _merge_event_edits(events, edited_events.to_dict("records")):
+            sl.session_state.processed_schedule = None
+
+        included = sum(1 for event in events if event.get("include", True))
+        sl.caption(f"{included} of {len(events)} events included as busy calendar time.")
+
+        if sl.button("Remove unchecked events", disabled=included == len(events)):
+            raw_data["events"] = [
+                event for event in events
+                if event.get("include", True)
+            ]
+            sl.session_state.processed_schedule = None
+            sl.rerun()
+    else:
+        sl.info("No events found for the selected range.")
+
+
 def _render_schedule(schedule):
     if not schedule:
         sl.info("Run the optimizer after fetching Canvas data to generate study blocks.")
@@ -188,6 +425,7 @@ def _render_schedule(schedule):
             "Study Block": event.get("title", "Study block"),
             "Start": _format_datetime(event.get("start_at")),
             "End": _format_datetime(event.get("end_at")),
+            "Target Calendar": event.get("calendar_id", "Personal"),
             "Details": event.get("description", ""),
         })
     sl.dataframe(rows, use_container_width=True, hide_index=True)
@@ -198,72 +436,43 @@ def ViewDashboard(on_run_optimizer=None):
     authenticated = sl.session_state.get("authenticated", False)
 
     sl.title("Welcome to your Canvas Dashboard!")
-    
-    #Workload Display
-    if len(AssignmentList) > 0:
-        col1, col2, col3 = sl.columns(3)
-        with col1:
-            sl.subheader("Here is the plan:")
-        with col2:
-            sl.button("Refresh Token")
-        with col3:
-            sl.button("Input Token")
-        sl.header("Assignment List")
-        col1, col2, col3, col4, col5 = sl.columns(5)
-        with col1:
-            sl.write("Assignment")
-        with col2:
-            sl.write("Class")
-        with col3:
-            sl.write("Time Left")
-        with col4:
-            sl.write("Point Worth")
-        with col5:
-            sl.write("Advice")
-        for index in range(len(AssignmentList)):
-            col1, col2, col3, col4, col5 = sl.columns(5)
-            with col1:
-                sl.caption(AssignmentList[index].GetName())
-            with col2:
-                sl.caption(AssignmentList[index].GetCourse())
-            with col3:
-                sl.caption(f"{AssignmentList[index].GetDate()} by {AssignmentList[index].GetTime()} ({AssignmentList[index].GetTimeLeft()} left)")
-            with col4:
-                sl.caption(AssignmentList[index].GetPoints())
-            with col5:
-                sl.caption("Generated assignment advice goes here")
-    
-    #Event Display
-    if len(EventList) > 0:
-        sl.header("Event List")
-        col1, col2, col3, col4, col5 = sl.columns(5)
-        with col1:
-            sl.write("Event")
-        with col2:
-            sl.write("Time")
-        with col3:
-            sl.write("Location")
-        with col4:
-            sl.write("Frequency")
-        with col5:
-            sl.write("Advice")
-        for index in range(len(EventList)):
-            col1, col2, col3, col4, col5 = sl.columns(5)
-            with col1:
-                sl.caption(EventList[index].GetTitle())
-            with col2:
-                sl.caption(sl.caption(f"{EventList[index].GetDate()} by {EventList[index].GetTime()} ({EventList[index].GetTimeLeft()} left)"))
-            with col3:
-                sl.caption(EventList[index].GetFreq())
-            with col4:
-                sl.caption(EventList[index].GetLoc())
-            with col5:
-                sl.caption("Generated event advice goes here")
-    
-    #Tell the user to add something when there is nothing
-    if len(AssignmentList) == 0 and len(EventList) == 0:
-        sl.write("This planner is empty, perhaps reality has decided to give you free time.")
-    elif len(AssignmentList) == 0:
-        sl.write("There are no assignments to plan for. Now would be a good time to enjoy your events.")
-    elif len(EventList) == 0:
-        sl.write("There are no events to plan for. All that remains are your assignments and you are free.")
+
+    if not authenticated:
+        sl.info("Please enter your Canvas token in the sidebar to begin.")
+        if AssignmentList or EventList:
+            sl.caption("Showing local prototype data.")
+            _render_workload(raw_data=None)
+        return
+
+    tab1, tab2, tab3 = sl.tabs(["Current Tasks", "Smart Schedule", "Settings"])
+
+    with tab1:
+        if raw_data is None:
+            sl.warning("Select calendars and click Fetch Canvas Data in the sidebar.")
+        else:
+            user = raw_data.get("user")
+            if user:
+                sl.subheader(f"Workload for {user}")
+            _render_editable_workload(raw_data)
+
+    with tab2:
+        if sl.button("Run Optimizer", type="primary", disabled=raw_data is None):
+            if on_run_optimizer is None:
+                sl.warning("Optimizer is not connected yet.")
+            else:
+                on_run_optimizer()
+
+        _render_schedule(sl.session_state.get("processed_schedule"))
+
+    with tab3:
+        if sl.button("Clear Session"):
+            sl.session_state.clear()
+            sl.rerun()
+
+
+VeiwDashboard = ViewDashboard
+
+
+if __name__ == "__main__":
+    sl.set_page_config(page_title="My Canvas Dashboard", layout="wide")
+    ViewDashboard()

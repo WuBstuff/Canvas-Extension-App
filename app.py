@@ -44,22 +44,57 @@ def _number_or_default(value, default=1):
         return default
 
 
+def _weight_or_default(value, default=1):
+    if value in (None, ""):
+        return default
+
+    text = str(value).strip()
+    if text.endswith("%"):
+        text = text[:-1]
+
+    try:
+        weight = float(text)
+    except (TypeError, ValueError):
+        return default
+
+    if weight > 1:
+        return weight / 100
+    return weight
+
+
 def _build_scheduler_inputs(raw_data):
     assignments = []
     for assignment in raw_data.get("assignments", []):
+        if not assignment.get("include", True):
+            continue
+
         due_at = _scheduler_datetime(assignment.get("due_at") or assignment.get("start_at"))
         if due_at is None:
             continue
 
+        course_name = (
+            assignment.get("course_name")
+            or assignment.get("context")
+            or assignment.get("course")
+            or "Unknown"
+        )
+
         assignments.append({
             "name": assignment.get("title") or assignment.get("name") or "Untitled",
+            "course_name": course_name,
             "due_at": due_at,
             "points": _number_or_default(assignment.get("points"), default=1),
-            "group_weight": _number_or_default(assignment.get("group_weight"), default=1),
+            "group_weight": _weight_or_default(assignment.get("group_weight"), default=1),
+            "assignment_group_name": assignment.get("assignment_group_name", "Unweighted"),
+            "canvas_assignment_id": assignment.get("canvas_assignment_id"),
+            "calendar_id": raw_data.get("personal_calendar_id"),
         })
 
     existing_events = []
     for event in raw_data.get("events", []):
+        if not event.get("include", True):
+            continue
+
         start = _scheduler_datetime(event.get("start") or event.get("start_at"))
         end = _scheduler_datetime(event.get("end") or event.get("end_at"))
         if start is not None and end is not None and end > start:
@@ -71,7 +106,7 @@ def _build_scheduler_inputs(raw_data):
 def run_optimizer():
     raw_data = st.session_state.get("raw_data")
     if not raw_data:
-        st.warning("Fetch assignments before running the optimizer.")
+        st.warning("Fetch Canvas data before running the optimizer.")
         return
 
     assignments, existing_events = _build_scheduler_inputs(raw_data)
@@ -102,6 +137,8 @@ if 'processed_schedule' not in st.session_state:
     st.session_state.processed_schedule = None
 if 'calendar_options' not in st.session_state:
     st.session_state.calendar_options = []
+if 'raw_data_version' not in st.session_state:
+    st.session_state.raw_data_version = 0
 
 # --- 2. SIDEBAR: AUTHENTICATION ---
 with st.sidebar:
@@ -150,10 +187,12 @@ with st.sidebar:
                 
                 st.session_state.raw_data = {
                     "user": st.session_state.ci.user.name,
+                    "personal_calendar_id": f"user_{st.session_state.ci.user.id}",
                     "assignments": workload,
                     "events": events,
                 }
                 st.session_state.processed_schedule = None
+                st.session_state.raw_data_version += 1
                 st.success(f"Pulled {len(workload)} assignments and {len(events)} events!")
 
 # --- 3. MAIN DASHBOARD LOGIC ---
