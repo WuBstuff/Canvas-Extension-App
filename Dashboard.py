@@ -426,12 +426,46 @@ def _render_schedule(schedule):
             "Start": _format_datetime(event.get("start_at")),
             "End": _format_datetime(event.get("end_at")),
             "Target Calendar": event.get("calendar_id", "Personal"),
+            "Canvas Event ID": event.get("pushed_canvas_event_id", ""),
             "Details": event.get("description", ""),
         })
     sl.dataframe(rows, use_container_width=True, hide_index=True)
 
 
-def ViewDashboard(on_run_optimizer=None):
+def _render_canvas_sync_result(result):
+    if not result:
+        return
+
+    action = result.get("action")
+    if action == "add":
+        created = result.get("created", [])
+        skipped = result.get("skipped", 0)
+        failed = result.get("failed", [])
+
+        if created:
+            sl.caption(f"Last Canvas add: {len(created)} block(s) created.")
+        if skipped:
+            sl.caption(f"{skipped} block(s) were already added in this session.")
+        if failed:
+            sl.dataframe(failed, use_container_width=True, hide_index=True)
+    elif action == "delete":
+        deleted = result.get("deleted", [])
+        failed = result.get("failed", [])
+        window = result.get("window")
+
+        if window:
+            sl.caption(f"Last Canvas delete checked {window[0]} through {window[1]}.")
+        if deleted:
+            sl.caption(f"{len(deleted)} generated block(s) deleted.")
+        if failed:
+            sl.dataframe(failed, use_container_width=True, hide_index=True)
+
+
+def ViewDashboard(
+    on_run_optimizer=None,
+    on_push_study_blocks=None,
+    on_delete_study_blocks=None,
+):
     raw_data = sl.session_state.get("raw_data")
     authenticated = sl.session_state.get("authenticated", False)
 
@@ -462,7 +496,19 @@ def ViewDashboard(on_run_optimizer=None):
             else:
                 on_run_optimizer()
 
-        _render_schedule(sl.session_state.get("processed_schedule"))
+        schedule = sl.session_state.get("processed_schedule")
+        _render_schedule(schedule)
+
+        if schedule:
+            col1, col2 = sl.columns(2)
+            with col1:
+                if sl.button("Add study blocks to Canvas", disabled=on_push_study_blocks is None):
+                    on_push_study_blocks()
+            with col2:
+                if sl.button("Delete generated study blocks from Canvas", disabled=on_delete_study_blocks is None):
+                    on_delete_study_blocks()
+
+        _render_canvas_sync_result(sl.session_state.get("canvas_sync_result"))
 
     with tab3:
         if sl.button("Clear Session"):

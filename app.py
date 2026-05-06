@@ -62,6 +62,33 @@ def _weight_or_default(value, default=1):
     return weight
 
 
+def _canvas_event_id(event):
+    if event is None:
+        return None
+    if isinstance(event, dict):
+        return event.get("id")
+    return getattr(event, "id", None)
+
+
+def _schedule_window(schedule):
+    starts = []
+    ends = []
+
+    for block in schedule or []:
+        start = _scheduler_datetime(block.get("start_at"))
+        end = _scheduler_datetime(block.get("end_at"))
+        if start is not None:
+            starts.append(start)
+        if end is not None:
+            ends.append(end)
+
+    if starts and ends:
+        return min(starts).date().isoformat(), max(ends).date().isoformat()
+
+    now = datetime.now()
+    return now.date().isoformat(), (now + timedelta(days=14)).date().isoformat()
+
+
 def _build_scheduler_inputs(raw_data):
     assignments = []
     for assignment in raw_data.get("assignments", []):
@@ -118,6 +145,7 @@ def run_optimizer():
     try:
         scheduler = SmartScheduler(assignments, existing_events)
         st.session_state.processed_schedule = scheduler.generate_predictions()
+        st.session_state.canvas_sync_result = None
     except Exception as exc:
         st.error(f"Could not generate the smart schedule: {exc}")
         return
@@ -127,6 +155,103 @@ def run_optimizer():
         st.success(f"Generated {count} study block{'s' if count != 1 else ''}.")
     else:
         st.info("No open study blocks were found in the current schedule window.")
+
+
+def push_study_blocks_to_canvas():
+    ci = st.session_state.get("ci")
+    raw_data = st.session_state.get("raw_data") or {}
+    schedule = st.session_state.get("processed_schedule") or []
+
+    if ci is None:
+        st.error("Connect to Canvas before adding study blocks.")
+        return
+    if not schedule:
+        st.warning("Run the optimizer before adding study blocks to Canvas.")
+        return
+
+    created = []
+    failed = []
+    skipped = 0
+
+    for block in schedule:
+        if block.get("pushed_canvas_event_id"):
+            skipped += 1
+            continue
+
+        calendar_id = block.get("calendar_id") or raw_data.get("personal_calendar_id")
+        try:
+            event = ci.push_study_block(
+                block.get("title", "study block"),
+                block.get("start_at"),
+                block.get("end_at"),
+                calendar_id=calendar_id,
+                description=block.get("description"),
+            )
+            event_id = _canvas_event_id(event)
+            block["pushed_canvas_event_id"] = event_id
+            created.append({
+                "id": event_id,
+                "title": block.get("title", "study block"),
+            })
+        except Exception as exc:
+            failed.append({
+                "title": block.get("title", "study block"),
+                "error": str(exc),
+            })
+
+    st.session_state.canvas_sync_result = {
+        "action": "add",
+        "created": created,
+        "failed": failed,
+        "skipped": skipped,
+    }
+
+    if created:
+        st.success(f"Added {len(created)} study block{'s' if len(created) != 1 else ''} to Canvas.")
+    if skipped:
+        st.info(f"Skipped {skipped} study block{'s' if skipped != 1 else ''} already added in this session.")
+    if failed:
+        st.error(f"Could not add {len(failed)} study block{'s' if len(failed) != 1 else ''}.")
+
+
+def delete_study_blocks_from_canvas():
+    ci = st.session_state.get("ci")
+    raw_data = st.session_state.get("raw_data") or {}
+    schedule = st.session_state.get("processed_schedule") or []
+
+    if ci is None:
+        st.error("Connect to Canvas before deleting study blocks.")
+        return
+
+    start_date, end_date = _schedule_window(schedule)
+    calendar_id = raw_data.get("personal_calendar_id")
+
+    try:
+        result = ci.delete_generated_study_blocks(start_date, end_date, calendar_id=calendar_id)
+    except Exception as exc:
+        st.error(f"Could not delete study blocks from Canvas: {exc}")
+        return
+
+    for block in schedule:
+        block.pop("pushed_canvas_event_id", None)
+
+    deleted = result.get("deleted", [])
+    failed = result.get("failed", [])
+
+    st.session_state.canvas_sync_result = {
+        "action": "delete",
+        "deleted": deleted,
+        "failed": failed,
+        "window": (start_date, end_date),
+    }
+
+    if deleted:
+        st.success(f"Deleted {len(deleted)} generated study block{'s' if len(deleted) != 1 else ''} from Canvas.")
+    else:
+        st.info("No generated study blocks were found in Canvas for the current schedule window.")
+    if failed:
+        st.error(f"Could not delete {len(failed)} study block{'s' if len(failed) != 1 else ''}.")
+
 
 # --- 1. SESSION STATE INITIALIZATION ---
 if 'authenticated' not in st.session_state:
@@ -139,6 +264,8 @@ if 'calendar_options' not in st.session_state:
     st.session_state.calendar_options = []
 if 'raw_data_version' not in st.session_state:
     st.session_state.raw_data_version = 0
+if 'canvas_sync_result' not in st.session_state:
+    st.session_state.canvas_sync_result = None
 
 # --- 2. SIDEBAR: AUTHENTICATION ---
 with st.sidebar:
@@ -188,12 +315,19 @@ with st.sidebar:
                 st.session_state.raw_data = {
                     "user": st.session_state.ci.user.name,
                     "personal_calendar_id": f"user_{st.session_state.ci.user.id}",
+                    "fetch_start": start,
+                    "fetch_end": end,
                     "assignments": workload,
                     "events": events,
                 }
                 st.session_state.processed_schedule = None
+                st.session_state.canvas_sync_result = None
                 st.session_state.raw_data_version += 1
                 st.success(f"Pulled {len(workload)} assignments and {len(events)} events!")
 
 # --- 3. MAIN DASHBOARD LOGIC ---
-ViewDashboard(on_run_optimizer=run_optimizer)
+ViewDashboard(
+    on_run_optimizer=run_optimizer,
+    on_push_study_blocks=push_study_blocks_to_canvas,
+    on_delete_study_blocks=delete_study_blocks_from_canvas,
+)
